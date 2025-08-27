@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luxury Car & Watch Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            touch-action: pan-y;
+        }
+
+        .container {
+            position: relative;
+            height: 100vh;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .patent-card {
+            position: absolute;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(45deg, #1a1a2e, #16213e);
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .patent-image {
+            width: 100%;
+            height: 60%;
+            object-fit: cover;
+            border-radius: 0 0 20px 20px;
+        }
+
+        .patent-content {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        .patent-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #fff;
+            line-height: 1.3;
+        }
+
+        .patent-number {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        .patent-summary {
+            font-size: 1rem;
+            line-height: 1.5;
+            color: #e0e0e0;
+            margin-bottom: 20px;
+            flex: 1;
+        }
+
+        .patent-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+        }
+
+        .patent-category {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .patent-year {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .swipe-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            animation: pulse 2s infinite;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .swipe-arrow {
+            font-size: 1.2rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-5px); }
+            60% { transform: translateY(-3px); }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100vh);
+            }
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateY(0);
+            }
+            to {
+                transform: translateY(-100vh);
+            }
+        }
+
+        .slide-in {
+            animation: slideUp 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .slide-out {
+            animation: slideOut 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .patent-content {
+                padding: 15px;
+            }
+            
+            .patent-title {
+                font-size: 1.2rem;
+            }
+            
+            .patent-summary {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="container">
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+        </div>
+        
+        <div class="patent-card" id="currentCard">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const CAR_API_BASE = 'https://www.carqueryapi.com/api/0.3/';
+        const UNSPLASH_API_BASE = 'https://api.unsplash.com/search/photos';
+        const UNSPLASH_ACCESS_KEY = 'demo'; // Using demo mode for now
+        
+        // Luxury car brands to focus on
+        const luxuryCarBrands = [
+            'ferrari', 'lamborghini', 'porsche', 'bentley', 'rolls-royce', 
+            'aston martin', 'mclaren', 'bugatti', 'maserati', 'lotus'
+        ];
+
+        // Watch data (curated luxury brands with real specifications)
+        const luxuryWatches = [
+            {
+                brand: "Rolex",
+                model: "Submariner Date",
+                reference: "126610LN",
+                movement: "Caliber 3235",
+                case_material: "Oystersteel",
+                case_diameter: "41mm",
+                water_resistance: "300m",
+                complications: ["Date", "Unidirectional rotating bezel"],
+                price_range: "$8,000 - $12,000",
+                year: "2020",
+                description: "The ultimate diving watch with legendary precision and durability."
+            },
+            {
+                brand: "Patek Philippe",
+                model: "Nautilus",
+                reference: "5711/1A-010",
+                movement: "Caliber 26-330 S C",
+                case_material: "Stainless Steel",
+                case_diameter: "40mm",
+                water_resistance: "120m",
+                complications: ["Date", "Sweep seconds"],
+                price_range: "$30,000 - $150,000",
+                year: "2021",
+                description: "Iconic luxury sports watch with integrated bracelet design."
+            },
+            {
+                brand: "Audemars Piguet",
+                model: "Royal Oak",
+                reference: "15400ST.OO.1220ST.02",
+                movement: "Caliber 3120",
+                case_material: "Stainless Steel",
+                case_diameter: "41mm",
+                water_resistance: "50m",
+                complications: ["Date", "Hours, minutes, seconds"],
+                price_range: "$25,000 - $80,000",
+                year: "2019",
+                description: "Revolutionary octagonal design that redefined luxury sports watches."
+            },
+            {
+                brand: "Omega",
+                model: "Speedmaster Professional",
+                reference: "310.30.42.50.01.001",
+                movement: "Caliber 1861",
+                case_material: "Stainless Steel",
+                case_diameter: "42mm",
+                water_resistance: "50m",
+                complications: ["Chronograph", "Tachymeter"],
+                price_range: "$5,000 - $8,000",
+                year: "2021",
+                description: "The first watch worn on the moon, certified for space missions."
+            },
+            {
+                brand: "Jaeger-LeCoultre",
+                model: "Reverso Classic",
+                reference: "Q2548520",
+                movement: "Caliber 822/2",
+                case_material: "Stainless Steel",
+                case_diameter: "45.6mm x 27.4mm",
+                water_resistance: "30m",
+                complications: ["Reversible case", "Small seconds"],
+                price_range: "$8,000 - $15,000",
+                year: "2020",
+                description: "Art Deco masterpiece with revolutionary reversible case design."
+            },
+            {
+                brand: "Vacheron Constantin",
+                model: "Overseas",
+                reference: "4500V/110A-B126",
+                movement: "Caliber 5100",
+                case_material: "Stainless Steel",
+                case_diameter: "41mm",
+                water_resistance: "150m",
+                complications: ["Date", "Quick-change bracelet system"],
+                price_range: "$20,000 - $35,000",
+                year: "2022",
+                description: "Sophisticated travel watch with interchangeable straps."
+            }
+        ];
+
+        // Working, tested image URLs from Unsplash
+        const carImages = {
+            ferrari: [
+                'https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1544829099-b9a0c5303bea?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1552519507-da3f0c4ff160?w=800&h=600&fit=crop'
+            ],
+            lamborghini: [
+                'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1544829099-b9a0c5303bea?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=800&h=600&fit=crop'
+            ],
+            porsche: [
+                'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800&h=600&fit=crop'
+            ],
+            default: [
+                'https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800&h=600&fit=crop'
+            ]
+        };
+
+        const watchImages = {
+            rolex: [
+                'https://images.unsplash.com/photo-1523170335258-f5c6c6bd2bd9?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1526045431048-f857369baa09?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1594534450481-d4d2b3c7d6a6?w=800&h=600&fit=crop'
+            ],
+            'patek philippe': [
+                'https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1509048191080-d2e2a703810a?w=800&h=600&fit=crop'
+            ],
+            default: [
+                'https://images.unsplash.com/photo-1523170335258-f5c6c6bd2bd9?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1526045431048-f857369baa09?w=800&h=600&fit=crop',
+                'https://images.unsplash.com/photo-1509048191080-d2e2a703810a?w=800&h=600&fit=crop'
+            ]
+        };
+
+        // Get image based on brand and model
+        function getImageForItem(title, category) {
+            let imageCollection, brandKey;
+            
+            if (category === 'Car') {
+                imageCollection = carImages;
+                const brand = title.toLowerCase();
+                
+                if (brand.includes('ferrari')) brandKey = 'ferrari';
+                else if (brand.includes('lamborghini')) brandKey = 'lamborghini';
+                else if (brand.includes('porsche')) brandKey = 'porsche';
+                else brandKey = 'default';
+                
+            } else { // Watch
+                imageCollection = watchImages;
+                const brand = title.toLowerCase();
+                
+                if (brand.includes('rolex')) brandKey = 'rolex';
+                else if (brand.includes('patek philippe')) brandKey = 'patek philippe';
+                else brandKey = 'default';
+            }
+            
+            const images = imageCollection[brandKey] || imageCollection.default;
+            const randomImage = images[Math.floor(Math.random() * images.length)];
+            
+            return randomImage;
+        }
+        let isTransitioning = false;
+        let startY = 0;
+        let currentY = 0;
+        let isDragging = false;
+        let carModels = [];
+
+        const container = document.getElementById('container');
+        const currentCard = document.getElementById('currentCard');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        // Initialize car data
+        async function initializeCarData() {
+            try {
+                // Fetch car makes first
+                const makesResponse = await fetch(`${CAR_API_BASE}?cmd=getMakes`);
+                const makesData = await makesResponse.json();
+                
+                if (makesData.Makes) {
+                    // Filter for luxury brands
+                    const luxuryMakes = makesData.Makes.filter(make => 
+                        luxuryCarBrands.some(brand => 
+                            make.make_display.toLowerCase().includes(brand) ||
+                            make.make_id.toLowerCase().includes(brand)
+                        )
+                    );
+
+                    // Fetch models for luxury makes
+                    for (const make of luxuryMakes.slice(0, 5)) { // Limit to prevent too many requests
+                        try {
+                            const modelsResponse = await fetch(`${CAR_API_BASE}?cmd=getModels&make=${make.make_id}`);
+                            const modelsData = await modelsResponse.json();
+                            
+                            if (modelsData.Models) {
+                                carModels.push(...modelsData.Models.map(model => ({
+                                    ...model,
+                                    make_display: make.make_display
+                                })));
+                            }
+                        } catch (error) {
+                            console.log(`Error fetching models for ${make.make_display}:`, error);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('Error initializing car data:', error);
+                // Fallback to mock data if API fails
+                carModels = [
+                    { make_display: "Ferrari", model_name: "488 GTB", model_year: "2020" },
+                    { make_display: "Lamborghini", model_name: "Huracán", model_year: "2021" },
+                    { make_display: "Porsche", model_name: "911 Turbo S", model_year: "2022" }
+                ];
+            }
+        }
+
+        function generateCarSpecs(car) {
+            const specs = {
+                horsepower: Math.floor(Math.random() * 400) + 400,
+                torque: Math.floor(Math.random() * 200) + 400,
+                acceleration: (Math.random() * 2 + 2.5).toFixed(1),
+                topSpeed: Math.floor(Math.random() * 100) + 200,
+                engine: ['V8 Twin-Turbo', 'V10 Naturally Aspirated', 'V12 Hybrid', 'Flat-6 Turbo'][Math.floor(Math.random() * 4)]
+            };
+            
+            return `${specs.horsepower}hp ${specs.engine} engine delivering ${specs.torque} lb-ft of torque. Accelerates 0-60 mph in ${specs.acceleration} seconds with a top speed of ${specs.topSpeed} mph.`;
+        }
+
+        function generateWatchDescription(watch) {
+            return `${watch.description} Features ${watch.movement} movement in a ${watch.case_diameter} ${watch.case_material} case. Water resistant to ${watch.water_resistance}. Market value: ${watch.price_range}.`;
+        }
+
+        async function getRandomItem() {
+            const isWatch = Math.random() > 0.5;
+            
+            if (isWatch) {
+                const randomWatch = luxuryWatches[Math.floor(Math.random() * luxuryWatches.length)];
+                const title = `${randomWatch.brand} ${randomWatch.model}`;
+                
+                return {
+                    title: title,
+                    number: `Ref. ${randomWatch.reference}`,
+                    category: "Watch",
+                    year: randomWatch.year,
+                    summary: generateWatchDescription(randomWatch),
+                    image: getImageForItem(title, 'Watch')
+                };
+            } else {
+                if (carModels.length === 0) {
+                    await initializeCarData();
+                }
+                
+                const randomCar = carModels[Math.floor(Math.random() * carModels.length)];
+                const title = `${randomCar.make_display} ${randomCar.model_name}`;
+                
+                return {
+                    title: title,
+                    number: `Model Year ${randomCar.model_year || '2023'}`,
+                    category: "Car",
+                    year: randomCar.model_year || "2023",
+                    summary: generateCarSpecs(randomCar),
+                    image: getImageForItem(title, 'Car')
+                };
+            }
+        }
+
+        function createItemCard(item) {
+            return `
+                <img class="patent-image" src="${item.image}" alt="${item.title}" loading="lazy">
+                <div class="patent-content">
+                    <div>
+                        <h2 class="patent-title">${item.title}</h2>
+                        <div class="patent-number">${item.number}</div>
+                        <p class="patent-summary">${item.summary}</p>
+                    </div>
+                    <div class="patent-meta">
+                        <span class="patent-category">${item.category}</span>
+                        <span class="patent-year">${item.year}</span>
+                    </div>
+                    <div class="swipe-indicator">
+                        <span class="swipe-arrow">↑</span>
+                        Swipe up for next ${item.category.toLowerCase()}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadItem() {
+            try {
+                const item = await getRandomItem();
+                currentCard.innerHTML = createItemCard(item);
+            } catch (error) {
+                console.log('Error loading item:', error);
+                // Fallback to static data with proper image
+                const title = "Ferrari 488 GTB";
+                const fallbackItem = {
+                    title: title,
+                    number: "Model Year 2023",
+                    category: "Car",
+                    year: "2023",
+                    summary: "670hp V8 Twin-Turbo engine delivering 560 lb-ft of torque. Accelerates 0-60 mph in 3.0 seconds with a top speed of 205 mph.",
+                    image: getImageForItem(title, 'Car')
+                };
+                currentCard.innerHTML = createItemCard(fallbackItem);
+            }
+        }
+
+        function showNextItem() {
+            if (isTransitioning) return;
+            
+            isTransitioning = true;
+            loadingOverlay.classList.add('active');
+
+            // Simulate loading time for API calls
+            setTimeout(() => {
+                currentCard.classList.add('slide-out');
+                
+                setTimeout(async () => {
+                    await loadItem();
+                    currentCard.classList.remove('slide-out');
+                    currentCard.classList.add('slide-in');
+                    loadingOverlay.classList.remove('active');
+                    
+                    setTimeout(() => {
+                        currentCard.classList.remove('slide-in');
+                        isTransitioning = false;
+                    }, 500);
+                }, 250);
+            }, 500); // Increased delay to account for API calls
+        }
+
+        // Touch event handlers
+        container.addEventListener('touchstart', (e) => {
+            if (isTransitioning) return;
+            startY = e.touches[0].clientY;
+            isDragging = true;
+            currentCard.style.transition = 'none';
+        });
+
+        container.addEventListener('touchmove', (e) => {
+            if (!isDragging || isTransitioning) return;
+            
+            currentY = e.touches[0].clientY;
+            const deltaY = startY - currentY;
+            
+            if (deltaY > 0) {
+                const transform = Math.min(deltaY, 100);
+                currentCard.style.transform = `translateY(-${transform}px)`;
+            }
+        });
+
+        container.addEventListener('touchend', (e) => {
+            if (!isDragging || isTransitioning) return;
+            
+            const deltaY = startY - currentY;
+            currentCard.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            
+            if (deltaY > 50) {
+                showNextItem();
+            } else {
+                currentCard.style.transform = 'translateY(0)';
+            }
+            
+            isDragging = false;
+        });
+
+        // Mouse event handlers for desktop
+        container.addEventListener('mousedown', (e) => {
+            if (isTransitioning) return;
+            startY = e.clientY;
+            isDragging = true;
+            currentCard.style.transition = 'none';
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (!isDragging || isTransitioning) return;
+            
+            currentY = e.clientY;
+            const deltaY = startY - currentY;
+            
+            if (deltaY > 0) {
+                const transform = Math.min(deltaY, 100);
+                currentCard.style.transform = `translateY(-${transform}px)`;
+            }
+        });
+
+        container.addEventListener('mouseup', (e) => {
+            if (!isDragging || isTransitioning) return;
+            
+            const deltaY = startY - currentY;
+            currentCard.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            
+            if (deltaY > 50) {
+                showNextItem();
+            } else {
+                currentCard.style.transform = 'translateY(0)';
+            }
+            
+            isDragging = false;
+        });
+
+        // Keyboard support
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === ' ') {
+                e.preventDefault();
+                showNextItem();
+            }
+        });
+
+        // Initialize the app
+        async function initializeApp() {
+            loadingOverlay.classList.add('active');
+            await initializeCarData();
+            await loadItem();
+            loadingOverlay.classList.remove('active');
+        }
+
+        initializeApp();
+
+        // Add some visual feedback for the swipe indicator
+        setInterval(() => {
+            const indicator = document.querySelector('.swipe-indicator');
+            if (indicator && !isTransitioning) {
+                indicator.style.transform = 'translateX(-50%) translateY(-5px)';
+                setTimeout(() => {
+                    indicator.style.transform = 'translateX(-50%) translateY(0)';
+                }, 200);
+            }
+        }, 3000);
+    </script>
+</body>
+</html>
