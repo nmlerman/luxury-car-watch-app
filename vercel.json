@@ -1,0 +1,8 @@
+{
+  "name": "luxury-car-watch-app",
+  "version": 2,
+  "public": true,
+  "github": {
+    "silent": true
+  }
+}
